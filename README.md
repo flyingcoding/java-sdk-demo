@@ -21,6 +21,7 @@ Java SDK的基准测试集合，基于[Java SDK](https://github.com/FISCO-BCOS/j
 * 提供KV合约压测Demo
 * 提供合约编译功能，将Solidity合约文件转换成Java合约文件
 * 提供合约编译功能，将Liquid合约文件编译后的WASM和ABI文件转换成Java合约文件
+* **提供多群组并行压测Demo（新增）**
 
 ## 使用手册
 
@@ -106,6 +107,17 @@ $ java -cp 'conf/:lib/*:apps/*' org.fisco.bcos.sdk.demo.perf.ParallelOkPerf [pre
 # tps: 压测QPS
 # groupId: 压测群组
 $ java -cp 'conf/:lib/*:apps/*' org.fisco.bcos.sdk.demo.perf.PerformanceKVTable [count] [tps] [groupId] [useKVTable] [valueLength]
+
+# 多群组并行压测（新增）
+# --------------------------
+# 同时对多个群组执行并行压测
+# groupIds: 群组ID列表，用逗号分隔（例如：group0,group1,group2）
+# userCount: 每个群组创建的账户数量
+# count: 每个群组的交易总量
+# qps: 每个群组的QPS
+$ java -cp 'conf/:lib/*:apps/*' org.fisco.bcos.sdk.demo.perf.PerformanceMultiGroupDMC [groupIds] [userCount] [count] [qps]
+# 示例：对三个群组进行压测
+$ java -cp 'conf/:lib/*:apps/*' org.fisco.bcos.sdk.demo.perf.PerformanceMultiGroupDMC group0,group1,group2 8 10000 100
 ```
 
 **以下是WASM环境的压力测试**
