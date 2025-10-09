@@ -33,13 +33,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * 快速并行转账压测工具（使用默认参数）
- * 功能：一键快速启动并行转账压测，无需任何参数
- * 使用方法：java -cp 'conf/:lib/*:apps/*' org.fisco.bcos.sdk.demo.perf.QuickParallelPerf
+ * 快速并行转账压测工具（使用默认参数） 功能：一键快速启动并行转账压测，无需任何参数 使用方法：java -cp 'conf/:lib/*:apps/*'
+ * org.fisco.bcos.sdk.demo.perf.QuickParallelPerf
  */
 public class QuickParallelPerf {
     private static final Logger logger = LoggerFactory.getLogger(QuickParallelPerf.class);
-    
+
     // 默认配置参数
     private static final int DEFAULT_GROUP_ID = 1;
     private static final int DEFAULT_USER_COUNT = 500;
@@ -54,9 +53,11 @@ public class QuickParallelPerf {
         int tps = args.length >= 4 ? Integer.parseInt(args[3]) : DEFAULT_TPS;
 
         try {
-            System.out.println("╔════════════════════════════════════════════════════════════════╗");
+            System.out.println(
+                    "╔════════════════════════════════════════════════════════════════╗");
             System.out.println("║          FISCO BCOS 并行转账快速压测工具                      ║");
-            System.out.println("╚════════════════════════════════════════════════════════════════╝");
+            System.out.println(
+                    "╚════════════════════════════════════════════════════════════════╝");
             System.out.println();
             System.out.println("📊 压测配置:");
             System.out.println("   群组ID        : " + groupId);
@@ -64,7 +65,7 @@ public class QuickParallelPerf {
             System.out.println("   转账交易数    : " + transferCount);
             System.out.println("   目标TPS       : " + tps);
             System.out.println();
-            
+
             // 初始化
             String configFileName = ConstantConfig.CONFIG_FILE_NAME;
             URL configUrl = QuickParallelPerf.class.getClassLoader().getResource(configFileName);
@@ -76,12 +77,13 @@ public class QuickParallelPerf {
             BcosSDK sdk = BcosSDK.build(configUrl.getPath());
             Client client = sdk.getClient(groupId);
             ThreadPoolService threadPoolService =
-                    new ThreadPoolService("QuickParallelPerf", 
+                    new ThreadPoolService(
+                            "QuickParallelPerf",
                             sdk.getConfig().getThreadPoolConfig().getMaxBlockingQueueSize());
 
             // 执行压测
             runQuickTest(client, userCount, transferCount, tps, threadPoolService);
-            
+
             threadPoolService.stop();
             System.exit(0);
 
@@ -92,19 +94,19 @@ public class QuickParallelPerf {
         }
     }
 
-    /**
-     * 执行快速压测
-     */
+    /** 执行快速压测 */
     private static void runQuickTest(
             Client client,
             int userCount,
             int transferCount,
             int tps,
-            ThreadPoolService threadPoolService) throws Exception {
+            ThreadPoolService threadPoolService)
+            throws Exception {
 
         // 阶段1：部署合约
         System.out.println("⏳ [1/4] 部署并行合约...");
-        ParallelOk parallelOk = ParallelOk.deploy(client, client.getCryptoSuite().getCryptoKeyPair());
+        ParallelOk parallelOk =
+                ParallelOk.deploy(client, client.getCryptoSuite().getCryptoKeyPair());
         parallelOk.enableParallel();
         System.out.println("✅ 合约部署成功: " + parallelOk.getContractAddress());
         System.out.println();
@@ -132,27 +134,30 @@ public class QuickParallelPerf {
         System.out.println("⏳ 验证结果...");
         boolean success = verifyQuick(parallelOk, dagUserInfo, tps, threadPoolService);
         System.out.println();
-        
+
         if (success) {
-            System.out.println("╔════════════════════════════════════════════════════════════════╗");
+            System.out.println(
+                    "╔════════════════════════════════════════════════════════════════╗");
             System.out.println("║                    ✅ 压测成功完成！                          ║");
-            System.out.println("╚════════════════════════════════════════════════════════════════╝");
+            System.out.println(
+                    "╚════════════════════════════════════════════════════════════════╝");
         } else {
-            System.out.println("╔════════════════════════════════════════════════════════════════╗");
+            System.out.println(
+                    "╔════════════════════════════════════════════════════════════════╗");
             System.out.println("║                ⚠️  压测完成但验证失败                          ║");
-            System.out.println("╚════════════════════════════════════════════════════════════════╝");
+            System.out.println(
+                    "╚════════════════════════════════════════════════════════════════╝");
         }
     }
 
-    /**
-     * 快速添加用户
-     */
+    /** 快速添加用户 */
     private static void addUsersQuick(
             ParallelOk parallelOk,
             DagUserInfo dagUserInfo,
             int userCount,
             int tps,
-            ThreadPoolService threadPoolService) throws InterruptedException {
+            ThreadPoolService threadPoolService)
+            throws InterruptedException {
 
         PerformanceCollector collector = new PerformanceCollector();
         collector.setTotal(userCount);
@@ -163,31 +168,41 @@ public class QuickParallelPerf {
         for (int i = 0; i < userCount; i++) {
             final int index = i;
             limiter.acquire();
-            threadPoolService.getThreadPool().execute(() -> {
-                String user = "user_" + Long.toHexString(currentSeconds) + "_" + Integer.toHexString(index);
-                BigInteger amount = new BigInteger("1000000000");
-                DagTransferUser dtu = new DagTransferUser();
-                dtu.setUser(user);
-                dtu.setAmount(amount);
+            threadPoolService
+                    .getThreadPool()
+                    .execute(
+                            () -> {
+                                String user =
+                                        "user_"
+                                                + Long.toHexString(currentSeconds)
+                                                + "_"
+                                                + Integer.toHexString(index);
+                                BigInteger amount = new BigInteger("1000000000");
+                                DagTransferUser dtu = new DagTransferUser();
+                                dtu.setUser(user);
+                                dtu.setAmount(amount);
 
-                ParallelOkCallback callback = new ParallelOkCallback(
-                        collector, dagUserInfo, ParallelOkCallback.ADD_USER_CALLBACK);
-                callback.setTimeout(0);
-                callback.setUser(dtu);
+                                ParallelOkCallback callback =
+                                        new ParallelOkCallback(
+                                                collector,
+                                                dagUserInfo,
+                                                ParallelOkCallback.ADD_USER_CALLBACK);
+                                callback.setTimeout(0);
+                                callback.setUser(dtu);
 
-                try {
-                    callback.recordStartTime();
-                    parallelOk.set(user, amount, callback);
-                    int current = progress.incrementAndGet();
-                    if (current % 100 == 0) {
-                        System.out.print("\r   进度: " + current + "/" + userCount);
-                    }
-                } catch (Exception e) {
-                    TransactionReceipt receipt = new TransactionReceipt();
-                    receipt.setStatus("-1");
-                    callback.onResponse(receipt);
-                }
-            });
+                                try {
+                                    callback.recordStartTime();
+                                    parallelOk.set(user, amount, callback);
+                                    int current = progress.incrementAndGet();
+                                    if (current % 100 == 0) {
+                                        System.out.print("\r   进度: " + current + "/" + userCount);
+                                    }
+                                } catch (Exception e) {
+                                    TransactionReceipt receipt = new TransactionReceipt();
+                                    receipt.setStatus("-1");
+                                    callback.onResponse(receipt);
+                                }
+                            });
         }
 
         while (collector.getReceived().intValue() != userCount) {
@@ -196,14 +211,13 @@ public class QuickParallelPerf {
         System.out.print("\r   进度: " + userCount + "/" + userCount + "\n");
     }
 
-    /**
-     * 快速查询账户
-     */
+    /** 快速查询账户 */
     private static void queryAccountsQuick(
             ParallelOk parallelOk,
             DagUserInfo dagUserInfo,
             int tps,
-            ThreadPoolService threadPoolService) throws InterruptedException {
+            ThreadPoolService threadPoolService)
+            throws InterruptedException {
 
         RateLimiter limiter = RateLimiter.create(tps);
         AtomicInteger queried = new AtomicInteger(0);
@@ -212,16 +226,19 @@ public class QuickParallelPerf {
         for (int i = 0; i < total; i++) {
             final int index = i;
             limiter.acquire();
-            threadPoolService.getThreadPool().execute(() -> {
-                try {
-                    DagTransferUser user = dagUserInfo.getUserList().get(index);
-                    BigInteger balance = parallelOk.balanceOf(user.getUser());
-                    user.setAmount(balance);
-                    queried.incrementAndGet();
-                } catch (ContractException e) {
-                    logger.error("Query failed: {}", e.getMessage());
-                }
-            });
+            threadPoolService
+                    .getThreadPool()
+                    .execute(
+                            () -> {
+                                try {
+                                    DagTransferUser user = dagUserInfo.getUserList().get(index);
+                                    BigInteger balance = parallelOk.balanceOf(user.getUser());
+                                    user.setAmount(balance);
+                                    queried.incrementAndGet();
+                                } catch (ContractException e) {
+                                    logger.error("Query failed: {}", e.getMessage());
+                                }
+                            });
         }
 
         while (queried.get() < total) {
@@ -229,15 +246,14 @@ public class QuickParallelPerf {
         }
     }
 
-    /**
-     * 快速执行转账
-     */
+    /** 快速执行转账 */
     private static void executeTransferQuick(
             ParallelOk parallelOk,
             DagUserInfo dagUserInfo,
             int transferCount,
             int tps,
-            ThreadPoolService threadPoolService) throws InterruptedException {
+            ThreadPoolService threadPoolService)
+            throws InterruptedException {
 
         PerformanceCollector collector = new PerformanceCollector();
         collector.setTotal(transferCount);
@@ -248,32 +264,40 @@ public class QuickParallelPerf {
         for (int i = 0; i < transferCount; i++) {
             final int index = i;
             limiter.acquire();
-            threadPoolService.getThreadPool().execute(() -> {
-                try {
-                    BigInteger amount = BigInteger.valueOf(random.nextInt(50) + 1);
-                    DagTransferUser from = dagUserInfo.getFrom(index);
-                    DagTransferUser to = dagUserInfo.getTo(index);
+            threadPoolService
+                    .getThreadPool()
+                    .execute(
+                            () -> {
+                                try {
+                                    BigInteger amount = BigInteger.valueOf(random.nextInt(50) + 1);
+                                    DagTransferUser from = dagUserInfo.getFrom(index);
+                                    DagTransferUser to = dagUserInfo.getTo(index);
 
-                    ParallelOkCallback callback = new ParallelOkCallback(
-                            collector, dagUserInfo, ParallelOkCallback.TRANS_CALLBACK);
-                    callback.setTimeout(0);
-                    callback.setFromUser(from);
-                    callback.setToUser(to);
-                    callback.setAmount(amount);
-                    callback.recordStartTime();
+                                    ParallelOkCallback callback =
+                                            new ParallelOkCallback(
+                                                    collector,
+                                                    dagUserInfo,
+                                                    ParallelOkCallback.TRANS_CALLBACK);
+                                    callback.setTimeout(0);
+                                    callback.setFromUser(from);
+                                    callback.setToUser(to);
+                                    callback.setAmount(amount);
+                                    callback.recordStartTime();
 
-                    parallelOk.transfer(from.getUser(), to.getUser(), amount, callback);
-                    
-                    int current = progress.incrementAndGet();
-                    if (current % 500 == 0) {
-                        System.out.print("\r   进度: " + current + "/" + transferCount);
-                    }
-                } catch (Exception e) {
-                    TransactionReceipt receipt = new TransactionReceipt();
-                    receipt.setStatus("-1");
-                    collector.onMessage(receipt, 0L);
-                }
-            });
+                                    parallelOk.transfer(
+                                            from.getUser(), to.getUser(), amount, callback);
+
+                                    int current = progress.incrementAndGet();
+                                    if (current % 500 == 0) {
+                                        System.out.print(
+                                                "\r   进度: " + current + "/" + transferCount);
+                                    }
+                                } catch (Exception e) {
+                                    TransactionReceipt receipt = new TransactionReceipt();
+                                    receipt.setStatus("-1");
+                                    collector.onMessage(receipt, 0L);
+                                }
+                            });
         }
 
         while (collector.getReceived().intValue() != transferCount) {
@@ -282,14 +306,13 @@ public class QuickParallelPerf {
         System.out.print("\r   进度: " + transferCount + "/" + transferCount + "\n");
     }
 
-    /**
-     * 快速验证
-     */
+    /** 快速验证 */
     private static boolean verifyQuick(
             ParallelOk parallelOk,
             DagUserInfo dagUserInfo,
             int tps,
-            ThreadPoolService threadPoolService) throws InterruptedException {
+            ThreadPoolService threadPoolService)
+            throws InterruptedException {
 
         RateLimiter limiter = RateLimiter.create(tps);
         AtomicInteger success = new AtomicInteger(0);
@@ -299,19 +322,22 @@ public class QuickParallelPerf {
         for (int i = 0; i < total; i++) {
             final int index = i;
             limiter.acquire();
-            threadPoolService.getThreadPool().execute(() -> {
-                try {
-                    DagTransferUser user = dagUserInfo.getUserList().get(index);
-                    BigInteger remoteBalance = parallelOk.balanceOf(user.getUser());
-                    if (user.getAmount().compareTo(remoteBalance) == 0) {
-                        success.incrementAndGet();
-                    } else {
-                        failed.incrementAndGet();
-                    }
-                } catch (ContractException e) {
-                    failed.incrementAndGet();
-                }
-            });
+            threadPoolService
+                    .getThreadPool()
+                    .execute(
+                            () -> {
+                                try {
+                                    DagTransferUser user = dagUserInfo.getUserList().get(index);
+                                    BigInteger remoteBalance = parallelOk.balanceOf(user.getUser());
+                                    if (user.getAmount().compareTo(remoteBalance) == 0) {
+                                        success.incrementAndGet();
+                                    } else {
+                                        failed.incrementAndGet();
+                                    }
+                                } catch (ContractException e) {
+                                    failed.incrementAndGet();
+                                }
+                            });
         }
 
         while (success.get() + failed.get() < total) {
@@ -322,4 +348,3 @@ public class QuickParallelPerf {
         return failed.get() == 0;
     }
 }
-

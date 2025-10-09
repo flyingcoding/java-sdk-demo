@@ -33,18 +33,15 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * 自动化并行转账合约压测工具
- * 功能：自动生成用户信息，一键完成并行转账压测
- * 使用方法：java -cp 'conf/:lib/*:apps/*' org.fisco.bcos.sdk.demo.perf.AutoParallelOkPerf [groupId] [userCount] [transferCount] [tps]
+ * 自动化并行转账合约压测工具 功能：自动生成用户信息，一键完成并行转账压测 使用方法：java -cp 'conf/:lib/*:apps/*'
+ * org.fisco.bcos.sdk.demo.perf.AutoParallelOkPerf [groupId] [userCount] [transferCount] [tps]
  */
 public class AutoParallelOkPerf {
     private static final Logger logger = LoggerFactory.getLogger(AutoParallelOkPerf.class);
     private static AtomicInteger addUserSended = new AtomicInteger(0);
     private static AtomicInteger transferSended = new AtomicInteger(0);
 
-    /**
-     * 打印使用说明
-     */
+    /** 打印使用说明 */
     private static void Usage() {
         System.out.println("===== 自动化并行转账压测工具 =====");
         System.out.println(" 功能：自动生成用户、部署合约、添加账户并执行转账压测");
@@ -85,15 +82,18 @@ public class AutoParallelOkPerf {
             Integer transferCount = Integer.valueOf(args[2]);
             Integer tps = Integer.valueOf(args[3]);
 
-            System.out.println("====================================================================");
+            System.out.println(
+                    "====================================================================");
             System.out.println("========== 自动化并行转账压测开始 ==========");
-            System.out.println("====================================================================");
+            System.out.println(
+                    "====================================================================");
             System.out.println("配置信息:");
             System.out.println("  群组ID        : " + groupId);
             System.out.println("  用户数量      : " + userCount);
             System.out.println("  转账交易总数  : " + transferCount);
             System.out.println("  目标TPS       : " + tps);
-            System.out.println("====================================================================");
+            System.out.println(
+                    "====================================================================");
 
             // 初始化SDK和客户端
             String configFile = configUrl.getPath();
@@ -119,10 +119,10 @@ public class AutoParallelOkPerf {
             System.out.println();
             System.out.println("【步骤 2/4】自动生成用户并添加到合约...");
             System.out.println("  生成 " + userCount + " 个用户，初始余额: 1000000000");
-            
+
             DagUserInfo dagUserInfo = new DagUserInfo();
             addUsers(parallelOk, dagUserInfo, userCount, tps, threadPoolService);
-            
+
             System.out.println("  ✓ 用户添加完成，共 " + dagUserInfo.getUserList().size() + " 个用户");
 
             // 步骤3：查询账户信息
@@ -135,9 +135,8 @@ public class AutoParallelOkPerf {
             System.out.println();
             System.out.println("【步骤 4/4】执行转账压测...");
             System.out.println("  发送 " + transferCount + " 笔转账交易，目标TPS: " + tps);
-            
-            executeTransferTest(
-                    parallelOk, dagUserInfo, transferCount, tps, threadPoolService);
+
+            executeTransferTest(parallelOk, dagUserInfo, transferCount, tps, threadPoolService);
 
             // 验证结果
             System.out.println();
@@ -146,10 +145,12 @@ public class AutoParallelOkPerf {
 
             // 完成
             System.out.println();
-            System.out.println("====================================================================");
+            System.out.println(
+                    "====================================================================");
             System.out.println("========== 自动化并行转账压测完成 ==========");
-            System.out.println("====================================================================");
-            
+            System.out.println(
+                    "====================================================================");
+
             threadPoolService.stop();
             System.exit(0);
 
@@ -160,9 +161,7 @@ public class AutoParallelOkPerf {
         }
     }
 
-    /**
-     * 自动生成用户并添加到合约
-     */
+    /** 自动生成用户并添加到合约 */
     private static void addUsers(
             ParallelOk parallelOk,
             DagUserInfo dagUserInfo,
@@ -196,7 +195,7 @@ public class AutoParallelOkPerf {
                                                     + "_"
                                                     + Integer.toHexString(index);
                                     BigInteger amount = new BigInteger("1000000000");
-                                    
+
                                     DagTransferUser dtu = new DagTransferUser();
                                     dtu.setUser(user);
                                     dtu.setAmount(amount);
@@ -244,9 +243,7 @@ public class AutoParallelOkPerf {
         }
     }
 
-    /**
-     * 查询所有账户信息
-     */
+    /** 查询所有账户信息 */
     private static void queryAccounts(
             ParallelOk parallelOk,
             DagUserInfo dagUserInfo,
@@ -288,9 +285,7 @@ public class AutoParallelOkPerf {
         }
     }
 
-    /**
-     * 执行转账压测
-     */
+    /** 执行转账压测 */
     private static void executeTransferTest(
             ParallelOk parallelOk,
             DagUserInfo dagUserInfo,
@@ -369,13 +364,11 @@ public class AutoParallelOkPerf {
         while (collector.getReceived().intValue() != transferCount) {
             Thread.sleep(1000);
         }
-        
+
         System.out.println("  ✓ 转账交易全部完成");
     }
 
-    /**
-     * 验证转账结果
-     */
+    /** 验证转账结果 */
     private static void verifyTransferData(
             ParallelOk parallelOk,
             DagUserInfo dagUserInfo,
@@ -429,7 +422,7 @@ public class AutoParallelOkPerf {
         System.out.println("    总用户数    : " + totalUsers);
         System.out.println("    验证成功    : " + verifySuccess.get());
         System.out.println("    验证失败    : " + verifyFailed.get());
-        
+
         if (verifyFailed.get() == 0) {
             System.out.println("  ✓ 所有账户余额验证通过！");
         } else {
@@ -437,4 +430,3 @@ public class AutoParallelOkPerf {
         }
     }
 }
-
