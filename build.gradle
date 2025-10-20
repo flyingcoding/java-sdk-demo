@@ -62,8 +62,8 @@ googleJavaFormat {
 }
 
 configurations {
-    integrationTestCompile.extendsFrom testCompile
-    integrationTestRuntime.extendsFrom testRuntime
+    integrationTestImplementation.extendsFrom testImplementation
+    integrationTestRuntimeOnly.extendsFrom testRuntimeOnly
 }
 
 configurations.all {
@@ -92,12 +92,12 @@ List logger = [
 ]
 
 dependencies {
-    compile ("org.fisco-bcos.java-sdk:fisco-bcos-java-sdk:${javaSDKVersion}")
-    compile ("org.fisco-bcos:solcJ:${solcJVersion}")
-    compile ("com.google.guava:guava:${guavaVersion}")
-    compile ("org.apache.commons:commons-collections4:${commonsCollections4Version}")
-    compile spring
-    compile logger
+    implementation ("org.fisco-bcos.java-sdk:fisco-bcos-java-sdk:${javaSDKVersion}")
+    implementation ("org.fisco-bcos:solcJ:${solcJVersion}")
+    implementation ("com.google.guava:guava:${guavaVersion}")
+    implementation ("org.apache.commons:commons-collections4:${commonsCollections4Version}")
+    implementation spring
+    implementation logger
 }
 
 configurations.all {
@@ -131,7 +131,7 @@ jar {
             into 'dist/apps'
         }
         copy {
-            from configurations.runtime
+            from configurations.runtimeClasspath
             into 'dist/lib'
         }
         copy {

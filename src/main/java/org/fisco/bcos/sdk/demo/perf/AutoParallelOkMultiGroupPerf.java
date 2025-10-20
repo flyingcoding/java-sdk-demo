@@ -2,7 +2,6 @@ package org.fisco.bcos.sdk.demo.perf;
 
 import com.google.common.util.concurrent.RateLimiter;
 import java.math.BigInteger;
-import java.net.URL;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -16,14 +15,12 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
-import org.fisco.bcos.sdk.BcosSDK;
 import org.fisco.bcos.sdk.client.Client;
 import org.fisco.bcos.sdk.demo.contract.ParallelOk;
 import org.fisco.bcos.sdk.demo.perf.callback.ParallelOkCallback;
 import org.fisco.bcos.sdk.demo.perf.collector.PerformanceCollector;
 import org.fisco.bcos.sdk.demo.perf.model.DagTransferUser;
 import org.fisco.bcos.sdk.demo.perf.model.DagUserInfo;
-import org.fisco.bcos.sdk.model.ConstantConfig;
 import org.fisco.bcos.sdk.model.TransactionReceipt;
 import org.fisco.bcos.sdk.transaction.model.exception.ContractException;
 import org.fisco.bcos.sdk.utils.ThreadPoolService;
@@ -61,19 +58,13 @@ public class AutoParallelOkMultiGroupPerf {
     /**
      * 主入口：解析多群组参数，创建多群组上下文并并发执行压测
      *
+     * <p>支持两种配置方式： 1. 默认配置：所有群组使用 config.toml 2. 群组特定配置：群组N使用 config-groupN.toml（如果存在）
+     *
      * @param args 命令行参数：[groupIds] [userCount] [transferCount] [tps]
      */
     public static void main(String[] args) {
+        MultiGroupConfigManager configManager = null;
         try {
-            // 加载配置
-            String configFileName = ConstantConfig.CONFIG_FILE_NAME;
-            URL configUrl =
-                    AutoParallelOkMultiGroupPerf.class.getClassLoader().getResource(configFileName);
-            if (configUrl == null) {
-                System.out.println("配置文件 " + configFileName + " 不存在！");
-                return;
-            }
-
             // 参数校验
             if (args.length < 4) {
                 usage();
@@ -97,28 +88,38 @@ public class AutoParallelOkMultiGroupPerf {
             System.out.println("  每组用户数    : " + userCountPerGroup);
             System.out.println("  每组交易数    : " + transferCountPerGroup);
             System.out.println("  每组目标TPS   : " + tpsPerGroup);
-            System.out.println(
-                    "====================================================================");
 
-            // 初始化SDK
-            BcosSDK sdk = BcosSDK.build(configUrl.getPath());
+            // 初始化配置管理器
+            configManager = new MultiGroupConfigManager();
+
+            // 显示每个群组使用的配置文件
+            configManager.printConfigSummary(groupIds);
 
             // 构建每个群组的上下文
             List<GroupContext> contexts = new ArrayList<>();
             for (Integer gid : groupIds) {
-                Client client = sdk.getClient(gid);
-                ThreadPoolService threadPoolService =
-                        new ThreadPoolService(
-                                "AutoParallelOkMultiGroupPerf-" + gid,
-                                sdk.getConfig().getThreadPoolConfig().getMaxBlockingQueueSize());
-                contexts.add(
-                        new GroupContext(
-                                gid,
-                                client,
-                                threadPoolService,
-                                userCountPerGroup,
-                                transferCountPerGroup,
-                                tpsPerGroup));
+                try {
+                    Client client = configManager.getClient(gid);
+                    ThreadPoolService threadPoolService =
+                            new ThreadPoolService(
+                                    "AutoParallelOkMultiGroupPerf-" + gid, 102400); // 使用默认队列大小
+                    contexts.add(
+                            new GroupContext(
+                                    gid,
+                                    client,
+                                    threadPoolService,
+                                    userCountPerGroup,
+                                    transferCountPerGroup,
+                                    tpsPerGroup));
+                } catch (Exception e) {
+                    System.out.println("警告：群组 " + gid + " 初始化失败: " + e.getMessage());
+                    logger.error("Failed to initialize group " + gid, e);
+                }
+            }
+
+            if (contexts.isEmpty()) {
+                System.out.println("错误：没有成功初始化的群组！");
+                return;
             }
 
             // 并发执行每个群组的压测
@@ -169,10 +170,19 @@ public class AutoParallelOkMultiGroupPerf {
             System.out.println("========== 多群组自动化并行转账压测完成 ==========");
             System.out.println(
                     "====================================================================");
+
+            // 关闭配置管理器
+            if (configManager != null) {
+                configManager.shutdown();
+            }
             System.exit(0);
         } catch (Exception e) {
             System.out.println("压测失败，错误信息: " + e.getMessage());
             logger.error("AutoParallelOkMultiGroupPerf failed: ", e);
+            // 确保资源释放
+            if (configManager != null) {
+                configManager.shutdown();
+            }
             System.exit(1);
         }
     }
