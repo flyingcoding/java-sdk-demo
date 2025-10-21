@@ -2,18 +2,8 @@ package org.fisco.bcos.sdk.demo.perf;
 
 import com.google.common.util.concurrent.RateLimiter;
 import java.math.BigInteger;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Map;
-import java.util.Random;
-import java.util.concurrent.Callable;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
+import java.util.*;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.fisco.bcos.sdk.client.Client;
 import org.fisco.bcos.sdk.demo.contract.ParallelOk;
@@ -37,24 +27,6 @@ public class AutoParallelOkMultiGroupPerf {
     private static final Logger logger =
             LoggerFactory.getLogger(AutoParallelOkMultiGroupPerf.class);
 
-    /** 打印使用说明 */
-    private static void usage() {
-        System.out.println("===== 多群组自动化并行转账压测工具 =====");
-        System.out.println(" 功能：对多个群组并发执行部署合约、添加账户、查询与转账压测");
-        System.out.println(" 使用方法:");
-        System.out.println(
-                " \t java -cp 'conf/:lib/*:apps/*' org.fisco.bcos.sdk.demo.perf.AutoParallelOkMultiGroupPerf [groupIds] [userCount] [transferCount] [tps]");
-        System.out.println(" 参数说明:");
-        System.out.println(" \t groupIds       : 逗号分隔的群组ID列表（如：1,2 或 1,2,3）");
-        System.out.println(" \t userCount      : 每群组生成的用户数量（如：1000）");
-        System.out.println(" \t transferCount  : 每群组转账交易总数（如：10000）");
-        System.out.println(" \t tps            : 每群组目标TPS/QPS（如：100）");
-        System.out.println();
-        System.out.println(" 示例:");
-        System.out.println(
-                " \t java -cp 'conf/:lib/*:apps/*' org.fisco.bcos.sdk.demo.perf.AutoParallelOkMultiGroupPerf 1,2 1000 10000 200");
-    }
-
     /**
      * 主入口：解析多群组参数，创建多群组上下文并并发执行压测
      *
@@ -74,9 +46,9 @@ public class AutoParallelOkMultiGroupPerf {
             // 解析参数
             String groupIdsArg = args[0];
             List<Integer> groupIds = parseGroupIds(groupIdsArg);
-            Integer userCountPerGroup = Integer.valueOf(args[1]);
-            Integer transferCountPerGroup = Integer.valueOf(args[2]);
-            Integer tpsPerGroup = Integer.valueOf(args[3]);
+            int userCountPerGroup = Integer.parseInt(args[1]);
+            int transferCountPerGroup = Integer.parseInt(args[2]);
+            int tpsPerGroup = Integer.parseInt(args[3]);
 
             System.out.println(
                     "====================================================================");
@@ -164,6 +136,99 @@ public class AutoParallelOkMultiGroupPerf {
             System.out.println("  成功群组/总群组: " + successGroups + "/" + groupIds.size());
             System.out.println("============================================================");
 
+            // 统一输出各群组的转账统计信息
+            System.out.println();
+            System.out.println("======================= 各群组性能统计 =======================");
+            for (Integer gid : groupIds) {
+                GroupResult r = resultMap.get(gid);
+                if (r != null && r.success && r.transferCollector != null) {
+                    r.transferCollector.printSummary();
+                }
+            }
+            System.out.println("============================================================");
+
+            // 计算并输出全局统计（基于所有群组转账阶段）
+            System.out.println();
+            System.out.println("========================= 全局总计 ==========================");
+            long overallStart = Long.MAX_VALUE;
+            long overallEnd = 0L;
+            long overallTx = 0L;
+            long overallSuccessTx = 0L;
+            double sumTpsInclude = 0D;
+            double sumTpsExclude = 0D;
+            double maxTpsInclude = 0D;
+            double maxTpsExclude = 0D;
+            long weightedAvgCostNumerator = 0L;
+            long weightedAvgCostDenominator = 0L;
+            long globalMaxCost = 0L;
+
+            for (Integer gid : groupIds) {
+                GroupResult r = resultMap.get(gid);
+                if (r == null || r.transferCollector == null) {
+                    continue;
+                }
+                PerformanceCollector c = r.transferCollector;
+                if (c.getStartTimestamp() != null) {
+                    overallStart = Math.min(overallStart, c.getStartTimestamp());
+                }
+                if (c.getEndTimestamp() != null) {
+                    overallEnd = Math.max(overallEnd, c.getEndTimestamp());
+                }
+                long tx = c.getTotal();
+                long successTx = tx - c.getError();
+                overallTx += tx;
+                overallSuccessTx += successTx;
+
+                double tpsInc = c.tpsIncludeErrors();
+                double tpsExc = c.tpsExcludeErrors();
+                sumTpsInclude += tpsInc;
+                sumTpsExclude += tpsExc;
+                if (tpsInc > maxTpsInclude) {
+                    maxTpsInclude = tpsInc;
+                }
+                if (tpsExc > maxTpsExclude) {
+                    maxTpsExclude = tpsExc;
+                }
+
+                weightedAvgCostNumerator += c.avgTimeCostMs() * tx;
+                weightedAvgCostDenominator += tx;
+                if (c.getMaxCost() > globalMaxCost) {
+                    globalMaxCost = c.getMaxCost();
+                }
+            }
+
+            int countedGroups = 0;
+            for (Integer gid : groupIds) {
+                GroupResult r = resultMap.get(gid);
+                if (r != null && r.transferCollector != null) {
+                    countedGroups++;
+                }
+            }
+
+            long wallTime =
+                    (overallStart == Long.MAX_VALUE ? 0L : Math.max(0L, overallEnd - overallStart));
+            double globalTpsInclude = (wallTime == 0 ? 0D : overallTx / ((double) wallTime / 1000));
+            double globalTpsExclude =
+                    (wallTime == 0 ? 0D : overallSuccessTx / ((double) wallTime / 1000));
+            double avgTpsInclude = (countedGroups == 0 ? 0D : (sumTpsInclude / countedGroups));
+            double avgTpsExclude = (countedGroups == 0 ? 0D : (sumTpsExclude / countedGroups));
+            long weightedAvgCost =
+                    (weightedAvgCostDenominator == 0
+                            ? 0L
+                            : (weightedAvgCostNumerator / weightedAvgCostDenominator));
+
+            System.out.println("总交易数: " + overallTx);
+            System.out.println("并发总时长: " + wallTime + "ms");
+            System.out.println("全局TPS(含错误): " + String.format("%.2f", globalTpsInclude));
+            System.out.println("全局TPS(不含错误): " + String.format("%.2f", globalTpsExclude));
+            System.out.println("平均TPS(含错误，按组): " + String.format("%.2f", avgTpsInclude));
+            System.out.println("平均TPS(不含错误，按组): " + String.format("%.2f", avgTpsExclude));
+            System.out.println("最大TPS(含错误，按组): " + String.format("%.2f", maxTpsInclude));
+            System.out.println("最大TPS(不含错误，按组): " + String.format("%.2f", maxTpsExclude));
+            System.out.println("加权平均交易耗时: " + weightedAvgCost + "ms");
+            System.out.println("最大交易耗时: " + globalMaxCost + "ms");
+            System.out.println("============================================================");
+
             System.out.println();
             System.out.println(
                     "====================================================================");
@@ -172,9 +237,7 @@ public class AutoParallelOkMultiGroupPerf {
                     "====================================================================");
 
             // 关闭配置管理器
-            if (configManager != null) {
-                configManager.shutdown();
-            }
+            configManager.shutdown();
             System.exit(0);
         } catch (Exception e) {
             System.out.println("压测失败，错误信息: " + e.getMessage());
@@ -185,6 +248,24 @@ public class AutoParallelOkMultiGroupPerf {
             }
             System.exit(1);
         }
+    }
+
+    /** 打印使用说明 */
+    private static void usage() {
+        System.out.println("===== 多群组自动化并行转账压测工具 =====");
+        System.out.println(" 功能：对多个群组并发执行部署合约、添加账户、查询与转账压测");
+        System.out.println(" 使用方法:");
+        System.out.println(
+                " \t java -cp 'conf/:lib/*:apps/*' org.fisco.bcos.sdk.demo.perf.AutoParallelOkMultiGroupPerf [groupIds] [userCount] [transferCount] [tps]");
+        System.out.println(" 参数说明:");
+        System.out.println(" \t groupIds       : 逗号分隔的群组ID列表（如：1,2 或 1,2,3）");
+        System.out.println(" \t userCount      : 每群组生成的用户数量（如：1000）");
+        System.out.println(" \t transferCount  : 每群组转账交易总数（如：10000）");
+        System.out.println(" \t tps            : 每群组目标TPS/QPS（如：100）");
+        System.out.println();
+        System.out.println(" 示例:");
+        System.out.println(
+                " \t java -cp 'conf/:lib/*:apps/*' org.fisco.bcos.sdk.demo.perf.AutoParallelOkMultiGroupPerf 1,2 1000 10000 200");
     }
 
     /**
@@ -207,123 +288,6 @@ public class AutoParallelOkMultiGroupPerf {
         return ids;
     }
 
-    /** 群组上下文，封装每个群组压测所需的对象 */
-    private static class GroupContext {
-        final int groupId;
-        final Client client;
-        final ThreadPoolService threadPoolService;
-        final int userCount;
-        final int transferCount;
-        final int tps;
-
-        GroupContext(
-                int groupId,
-                Client client,
-                ThreadPoolService threadPoolService,
-                int userCount,
-                int transferCount,
-                int tps) {
-            this.groupId = groupId;
-            this.client = client;
-            this.threadPoolService = threadPoolService;
-            this.userCount = userCount;
-            this.transferCount = transferCount;
-            this.tps = tps;
-        }
-    }
-
-    /** 群组压测任务：依次执行部署、加用户、查询、转账与验证 */
-    private static class GroupPerfTask implements Callable<GroupResult> {
-        private final GroupContext ctx;
-
-        GroupPerfTask(GroupContext ctx) {
-            this.ctx = ctx;
-        }
-
-        @Override
-        public GroupResult call() {
-            GroupResult result = new GroupResult();
-            result.groupId = ctx.groupId;
-            try {
-                System.out.println();
-                System.out.println("[Group " + ctx.groupId + "] 【步骤 1/4】部署并行转账合约...");
-                ParallelOk parallelOk =
-                        ParallelOk.deploy(
-                                ctx.client, ctx.client.getCryptoSuite().getCryptoKeyPair());
-                parallelOk.enableParallel();
-                result.contractAddress = parallelOk.getContractAddress();
-                System.out.println(
-                        "[Group " + ctx.groupId + "]  ✓ 合约部署成功: " + result.contractAddress);
-
-                // 生成并添加用户
-                System.out.println(
-                        "[Group " + ctx.groupId + "] 【步骤 2/4】生成并添加 " + ctx.userCount + " 个用户...");
-                DagUserInfo dagUserInfo = new DagUserInfo();
-                addUsersForGroup(
-                        parallelOk,
-                        dagUserInfo,
-                        ctx.userCount,
-                        ctx.tps,
-                        ctx.threadPoolService,
-                        ctx.groupId);
-                System.out.println("[Group " + ctx.groupId + "]  ✓ 用户添加完成");
-
-                // 查询账户
-                System.out.println("[Group " + ctx.groupId + "] 【步骤 3/4】查询账户余额...");
-                queryAccountsForGroup(
-                        parallelOk, dagUserInfo, ctx.tps, ctx.threadPoolService, ctx.groupId);
-                System.out.println("[Group " + ctx.groupId + "]  ✓ 账户查询完成");
-
-                // 执行转账
-                System.out.println(
-                        "[Group "
-                                + ctx.groupId
-                                + "] 【步骤 4/4】执行转账压测，共 "
-                                + ctx.transferCount
-                                + " 笔，TPS="
-                                + ctx.tps
-                                + "...");
-                executeTransferForGroup(
-                        parallelOk,
-                        dagUserInfo,
-                        ctx.transferCount,
-                        ctx.tps,
-                        ctx.threadPoolService,
-                        ctx.groupId);
-                System.out.println("[Group " + ctx.groupId + "]  ✓ 转账交易完成");
-
-                // 验证
-                System.out.println("[Group " + ctx.groupId + "] 【验证】开始验证余额...");
-                boolean verifyOk =
-                        verifyForGroup(
-                                parallelOk,
-                                dagUserInfo,
-                                ctx.tps,
-                                ctx.threadPoolService,
-                                ctx.groupId);
-                result.success = verifyOk;
-                if (verifyOk) {
-                    System.out.println("[Group " + ctx.groupId + "]  ✓ 余额验证通过");
-                } else {
-                    System.out.println("[Group " + ctx.groupId + "]  ✗ 余额验证失败");
-                }
-            } catch (Exception e) {
-                result.success = false;
-                result.errorMessage = e.getMessage();
-                logger.error("Group {} failed: ", ctx.groupId, e);
-            }
-            return result;
-        }
-    }
-
-    /** 群组结果信息 */
-    private static class GroupResult {
-        int groupId;
-        boolean success;
-        String contractAddress;
-        String errorMessage;
-    }
-
     /**
      * 为指定群组添加用户
      *
@@ -333,8 +297,9 @@ public class AutoParallelOkMultiGroupPerf {
      * @param tps 每群组TPS
      * @param threadPoolService 线程池
      * @param groupId 群组ID（打印用途）
+     * @return 性能采集器，用于后续统一汇总打印
      */
-    private static void addUsersForGroup(
+    private static PerformanceCollector addUsersForGroup(
             ParallelOk parallelOk,
             DagUserInfo dagUserInfo,
             int userCount,
@@ -345,6 +310,9 @@ public class AutoParallelOkMultiGroupPerf {
 
         PerformanceCollector collector = new PerformanceCollector();
         collector.setTotal(userCount);
+        collector.setLabel("Group " + groupId + " | AddUsers");
+        collector.setAutoPrint(false); // 阶段内不打印汇总，统一在所有群组完成后输出
+        collector.setEnableProgress(false);
         RateLimiter limiter = RateLimiter.create(tps);
         long currentSeconds = System.currentTimeMillis() / 1000L;
         AtomicInteger progress = new AtomicInteger(0);
@@ -399,9 +367,10 @@ public class AutoParallelOkMultiGroupPerf {
                             });
         }
 
-        while (collector.getReceived().intValue() != userCount) {
+        while (collector.getReceived() != userCount) {
             Thread.sleep(100);
         }
+        return collector;
     }
 
     /**
@@ -467,8 +436,9 @@ public class AutoParallelOkMultiGroupPerf {
      * @param tps 每群组TPS
      * @param threadPoolService 线程池
      * @param groupId 群组ID（打印用途）
+     * @return 性能采集器，用于后续统一汇总打印
      */
-    private static void executeTransferForGroup(
+    private static PerformanceCollector executeTransferForGroup(
             ParallelOk parallelOk,
             DagUserInfo dagUserInfo,
             int transferCount,
@@ -479,6 +449,9 @@ public class AutoParallelOkMultiGroupPerf {
 
         PerformanceCollector collector = new PerformanceCollector();
         collector.setTotal(transferCount);
+        collector.setLabel("Group " + groupId + " | Transfer");
+        collector.setAutoPrint(false); // 阶段内不打印汇总，统一在所有群组完成后输出
+        collector.setEnableProgress(false);
         RateLimiter limiter = RateLimiter.create(tps);
         AtomicInteger progress = new AtomicInteger(0);
         Random random = new Random();
@@ -528,9 +501,10 @@ public class AutoParallelOkMultiGroupPerf {
                             });
         }
 
-        while (collector.getReceived().intValue() != transferCount) {
+        while (collector.getReceived() != transferCount) {
             Thread.sleep(500);
         }
+        return collector;
     }
 
     /**
@@ -592,5 +566,126 @@ public class AutoParallelOkMultiGroupPerf {
         System.out.println(
                 "[Group " + groupId + "]  验证结果: 成功=" + success.get() + ", 失败=" + failed.get());
         return failed.get() == 0;
+    }
+
+    /** 群组上下文，封装每个群组压测所需的对象 */
+    private static class GroupContext {
+        final int groupId;
+        final Client client;
+        final ThreadPoolService threadPoolService;
+        final int userCount;
+        final int transferCount;
+        final int tps;
+
+        GroupContext(
+                int groupId,
+                Client client,
+                ThreadPoolService threadPoolService,
+                int userCount,
+                int transferCount,
+                int tps) {
+            this.groupId = groupId;
+            this.client = client;
+            this.threadPoolService = threadPoolService;
+            this.userCount = userCount;
+            this.transferCount = transferCount;
+            this.tps = tps;
+        }
+    }
+
+    /** 群组压测任务：依次执行部署、加用户、查询、转账与验证 */
+    private static class GroupPerfTask implements Callable<GroupResult> {
+        private final GroupContext ctx;
+
+        GroupPerfTask(GroupContext ctx) {
+            this.ctx = ctx;
+        }
+
+        @Override
+        public GroupResult call() {
+            GroupResult result = new GroupResult();
+            result.groupId = ctx.groupId;
+            try {
+                System.out.println();
+                System.out.println("[Group " + ctx.groupId + "] 【步骤 1/4】部署并行转账合约...");
+                ParallelOk parallelOk =
+                        ParallelOk.deploy(
+                                ctx.client, ctx.client.getCryptoSuite().getCryptoKeyPair());
+                parallelOk.enableParallel();
+                result.contractAddress = parallelOk.getContractAddress();
+                System.out.println(
+                        "[Group " + ctx.groupId + "]  ✓ 合约部署成功: " + result.contractAddress);
+
+                // 生成并添加用户
+                System.out.println(
+                        "[Group " + ctx.groupId + "] 【步骤 2/4】生成并添加 " + ctx.userCount + " 个用户...");
+                DagUserInfo dagUserInfo = new DagUserInfo();
+                result.addUserCollector =
+                        addUsersForGroup(
+                                parallelOk,
+                                dagUserInfo,
+                                ctx.userCount,
+                                ctx.tps,
+                                ctx.threadPoolService,
+                                ctx.groupId);
+                System.out.println("[Group " + ctx.groupId + "]  ✓ 用户添加完成");
+
+                // 查询账户
+                System.out.println("[Group " + ctx.groupId + "] 【步骤 3/4】查询账户余额...");
+                queryAccountsForGroup(
+                        parallelOk, dagUserInfo, ctx.tps, ctx.threadPoolService, ctx.groupId);
+                System.out.println("[Group " + ctx.groupId + "]  ✓ 账户查询完成");
+
+                // 执行转账
+                System.out.println(
+                        "[Group "
+                                + ctx.groupId
+                                + "] 【步骤 4/4】执行转账压测，共 "
+                                + ctx.transferCount
+                                + " 笔，TPS="
+                                + ctx.tps
+                                + "...");
+                result.transferCollector =
+                        executeTransferForGroup(
+                                parallelOk,
+                                dagUserInfo,
+                                ctx.transferCount,
+                                ctx.tps,
+                                ctx.threadPoolService,
+                                ctx.groupId);
+                System.out.println("[Group " + ctx.groupId + "]  ✓ 转账交易完成");
+
+                // 验证
+                System.out.println("[Group " + ctx.groupId + "] 【验证】开始验证余额...");
+                boolean verifyOk =
+                        verifyForGroup(
+                                parallelOk,
+                                dagUserInfo,
+                                ctx.tps,
+                                ctx.threadPoolService,
+                                ctx.groupId);
+                result.success = verifyOk;
+                if (verifyOk) {
+                    System.out.println("[Group " + ctx.groupId + "]  ✓ 余额验证通过");
+                } else {
+                    System.out.println("[Group " + ctx.groupId + "]  ✗ 余额验证失败");
+                }
+            } catch (Exception e) {
+                result.success = false;
+                result.errorMessage = e.getMessage();
+                logger.error("Group {} failed: ", ctx.groupId, e);
+            }
+            return result;
+        }
+    }
+
+    /** 群组结果信息 */
+    private static class GroupResult {
+        int groupId;
+        boolean success;
+        String contractAddress;
+        String errorMessage;
+        PerformanceCollector addUserCollector;
+        PerformanceCollector transferCollector;
     }
 }
