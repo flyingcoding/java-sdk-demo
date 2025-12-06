@@ -187,63 +187,72 @@ public class PerformanceCollector {
         Long totalTime = getDurationMillis();
         String prefix = (label != null ? ("[" + label + "] ") : "");
 
-        System.out.println(prefix + "total");
+        System.out.println(prefix + "性能统计");
         System.out.println("===================================================================");
-        System.out.println("Total transactions:  " + total);
-        System.out.println("Total time: " + totalTime + "ms");
+        System.out.println("总交易数        : " + total);
+        System.out.println("总耗时          : " + totalTime + "ms");
         System.out.println(
-                "TPS(include error requests): " + total / ((double) Math.max(1, totalTime) / 1000));
+                "TPS(含错误)     : "
+                        + String.format(
+                                "%.2f", total / ((double) Math.max(1, totalTime) / 1000)));
         System.out.println(
-                "TPS(exclude error requests): "
-                        + (double) (total - error.get())
-                                / ((double) Math.max(1, totalTime) / 1000));
-        System.out.println("Avg time cost: " + avgTimeCostMs() + "ms");
+                "TPS(不含错误)   : "
+                        + String.format(
+                                "%.2f",
+                                (double) (total - error.get())
+                                        / ((double) Math.max(1, totalTime) / 1000)));
+        System.out.println("平均耗时        : " + avgTimeCostMs() + "ms");
+        System.out.println("最大耗时        : " + getMaxCost() + "ms");
         System.out.println(
-                "Error rate: " + (error.get() / (double) Math.max(1, received.get())) * 100 + "%");
+                "错误率          : "
+                        + String.format(
+                                "%.2f", (error.get() / (double) Math.max(1, received.get())) * 100)
+                        + "%");
 
-        System.out.println("Time area:");
+        System.out.println("耗时分布:");
         System.out.println(
-                "0    < time <  50ms   : "
+                "0    < t < 50ms     : "
                         + less50
-                        + "  : "
-                        + (double) less50.get() / Math.max(1, total) * 100
-                        + "%");
+                        + " ("
+                        + String.format("%.2f", (double) less50.get() / Math.max(1, total) * 100)
+                        + "%)");
         System.out.println(
-                "50   < time <  100ms  : "
+                "50   < t < 100ms    : "
                         + less100
-                        + "  : "
-                        + (double) less100.get() / Math.max(1, total) * 100
-                        + "%");
+                        + " ("
+                        + String.format("%.2f", (double) less100.get() / Math.max(1, total) * 100)
+                        + "%)");
         System.out.println(
-                "100  < time <  200ms  : "
+                "100  < t < 200ms    : "
                         + less200
-                        + "  : "
-                        + (double) less200.get() / Math.max(1, total) * 100
-                        + "%");
+                        + " ("
+                        + String.format("%.2f", (double) less200.get() / Math.max(1, total) * 100)
+                        + "%)");
         System.out.println(
-                "200  < time <  400ms  : "
+                "200  < t < 400ms    : "
                         + less400
-                        + "  : "
-                        + (double) less400.get() / Math.max(1, total) * 100
-                        + "%");
+                        + " ("
+                        + String.format("%.2f", (double) less400.get() / Math.max(1, total) * 100)
+                        + "%)");
         System.out.println(
-                "400  < time <  1000ms : "
+                "400  < t < 1000ms   : "
                         + less1000
-                        + "  : "
-                        + (double) less1000.get() / Math.max(1, total) * 100
-                        + "%");
+                        + " ("
+                        + String.format("%.2f", (double) less1000.get() / Math.max(1, total) * 100)
+                        + "%)");
         System.out.println(
-                "1000 < time <  2000ms : "
+                "1000 < t < 2000ms   : "
                         + less2000
-                        + "  : "
-                        + (double) less2000.get() / Math.max(1, total) * 100
-                        + "%");
+                        + " ("
+                        + String.format("%.2f", (double) less2000.get() / Math.max(1, total) * 100)
+                        + "%)");
         System.out.println(
-                "2000 < time           : "
+                "2000 < t            : "
                         + timeout2000
-                        + "  : "
-                        + (double) timeout2000.get() / Math.max(1, total) * 100
-                        + "%");
+                        + " ("
+                        + String.format(
+                                "%.2f", (double) timeout2000.get() / Math.max(1, total) * 100)
+                        + "%)");
     }
 
     /** 获取总耗时（毫秒）；若尚未结束，则返回当前与start的差 */
