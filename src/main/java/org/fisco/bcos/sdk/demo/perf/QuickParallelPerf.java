@@ -103,6 +103,16 @@ public class QuickParallelPerf {
             ThreadPoolService threadPoolService)
             throws Exception {
 
+        PerformanceCollector addUserCollector = new PerformanceCollector();
+        addUserCollector.setTotal(userCount);
+        addUserCollector.setLabel("添加用户");
+        addUserCollector.setAutoPrint(false);
+
+        PerformanceCollector transferCollector = new PerformanceCollector();
+        transferCollector.setTotal(transferCount);
+        transferCollector.setLabel("转账");
+        transferCollector.setAutoPrint(false);
+
         // 阶段1：部署合约
         System.out.println("⏳ [1/4] 部署并行合约...");
         ParallelOk parallelOk =
@@ -114,7 +124,7 @@ public class QuickParallelPerf {
         // 阶段2：生成并添加用户
         System.out.println("⏳ [2/4] 生成 " + userCount + " 个用户并添加到合约...");
         DagUserInfo dagUserInfo = new DagUserInfo();
-        addUsersQuick(parallelOk, dagUserInfo, userCount, tps, threadPoolService);
+        addUsersQuick(parallelOk, dagUserInfo, userCount, tps, threadPoolService, addUserCollector);
         System.out.println("✅ 用户添加完成，共 " + dagUserInfo.getUserList().size() + " 个");
         System.out.println();
 
@@ -126,13 +136,19 @@ public class QuickParallelPerf {
 
         // 阶段4：执行转账
         System.out.println("⏳ [4/4] 执行 " + transferCount + " 笔转账...");
-        executeTransferQuick(parallelOk, dagUserInfo, transferCount, tps, threadPoolService);
+        executeTransferQuick(
+                parallelOk, dagUserInfo, transferCount, tps, threadPoolService, transferCollector);
         System.out.println("✅ 转账完成");
         System.out.println();
 
         // 验证
         System.out.println("⏳ 验证结果...");
         boolean success = verifyQuick(parallelOk, dagUserInfo, tps, threadPoolService);
+        System.out.println();
+
+        System.out.println("📈 性能统计汇总:");
+        // addUserCollector.printSummary();
+        transferCollector.printSummary();
         System.out.println();
 
         if (success) {
@@ -156,11 +172,10 @@ public class QuickParallelPerf {
             DagUserInfo dagUserInfo,
             int userCount,
             int tps,
-            ThreadPoolService threadPoolService)
+            ThreadPoolService threadPoolService,
+            PerformanceCollector collector)
             throws InterruptedException {
 
-        PerformanceCollector collector = new PerformanceCollector();
-        collector.setTotal(userCount);
         RateLimiter limiter = RateLimiter.create(tps);
         long currentSeconds = System.currentTimeMillis() / 1000L;
         AtomicInteger progress = new AtomicInteger(0);
@@ -252,11 +267,10 @@ public class QuickParallelPerf {
             DagUserInfo dagUserInfo,
             int transferCount,
             int tps,
-            ThreadPoolService threadPoolService)
+            ThreadPoolService threadPoolService,
+            PerformanceCollector collector)
             throws InterruptedException {
 
-        PerformanceCollector collector = new PerformanceCollector();
-        collector.setTotal(transferCount);
         RateLimiter limiter = RateLimiter.create(tps);
         AtomicInteger progress = new AtomicInteger(0);
         Random random = new Random();
