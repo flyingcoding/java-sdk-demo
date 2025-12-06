@@ -193,8 +193,7 @@ public class PerformanceCollector {
         System.out.println("总耗时          : " + totalTime + "ms");
         System.out.println(
                 "TPS(含错误)     : "
-                        + String.format(
-                                "%.2f", total / ((double) Math.max(1, totalTime) / 1000)));
+                        + String.format("%.2f", total / ((double) Math.max(1, totalTime) / 1000)));
         System.out.println(
                 "TPS(不含错误)   : "
                         + String.format(
